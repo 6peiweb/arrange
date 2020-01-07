@@ -108,13 +108,18 @@
             // { id: 5, y: 100, x: 150 },
             // { id: 6, y: 100, x: 150 },
             // { id: 8, y: 100, x: 150 },
-            { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "99" }
+            // { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "101" }
         ];
         const boxesText = localStorage.getItem('boxes') || JSON.stringify(originBoxes);
         const vm = new Vue({
             el: '#app',
             data: {
-                boxes: JSON.parse(boxesText),
+                boxes: JSON.parse(boxesText).map(box => {
+                    box.id = +box.id;
+                    box.x = +box.x;
+                    box.y = +box.y;
+                    return box;
+                }),
             },
             methods: {
                 addBox() {
@@ -167,7 +172,12 @@
             NO_NARROW: 3,
         };
         const LAW_VALUE = Math.atan(42 / 68);
-        main(JSON.parse(boxesText));
+        main(JSON.parse(boxesText).map(box => {
+            box.id = +box.id;
+            box.x = +box.x;
+            box.y = +box.y;
+            return box;
+        }));
 
         function arrangeBoxs(boxes = []) {
             if (!boxes.length) {
@@ -404,7 +414,7 @@
                     });
                 }
             } else {
-                [sidewaysBoxes, endwaysBoxes] = [sidewaysBoxes_2, endwaysBoxes_2];
+                return [sidewaysBoxes, endwaysBoxes] = [sidewaysBoxes_2, endwaysBoxes_2];
                 const enlargeHRatio = highCount_2 / HEIGHT;
                 const enlargeWRatio = longCount_2 / WIDTH;
                 if (enlargeHRatio > enlargeWRatio) {
@@ -763,9 +773,10 @@
             if (!boxes.length) {
                 return null;
             }
+            boxes = deepClone(boxes);
             const boxContainers = document.querySelectorAll('box-container');
-            const isAllEndways = boxes.every(box => box.x <= box.y);
-            const isAllSideways = boxes.every(box => box.x >= box.y);
+            const isAllEndways = boxes.every(box => +box.x <= +box.y);
+            const isAllSideways = boxes.every(box => +box.x >= +box.y);
             if (isAllEndways) {
                 let leftCount = 0;
                 boxes.forEach(box => {
@@ -829,7 +840,7 @@
 
         // 启动排列
         function main(originBoxes) {
-            const boxes = Object.assign([], originBoxes);
+            const boxes = deepClone(originBoxes);
             demoShow(boxes);
             const boxContainers = document.querySelectorAll('box-container');
             const positionBoxes = arrangeBoxs(boxes);
