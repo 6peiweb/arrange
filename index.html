@@ -108,9 +108,7 @@
             // { id: 5, y: 100, x: 150 },
             // { id: 6, y: 100, x: 150 },
             // { id: 8, y: 100, x: 150 },
-            { id: 1, x: 1, y: 2 },
-            { id: 2, x: 2, y: 1 },
-            { id: 3, x: 1, y: 4 },
+            { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "99" }
         ];
         const boxesText = localStorage.getItem('boxes') || JSON.stringify(originBoxes);
         const vm = new Vue({
@@ -180,7 +178,6 @@
             if (isAllEndways) {
                 return endwaysArrange(boxes, BOX_TYPE.NO_NARROW);
             } else if (isAllSideways) {
-                console.log(111);
                 boxes.map(box => {
                     let { x, y } = box;
                     box.x = y;
@@ -213,7 +210,6 @@
             WIDTH: 680,
             HEIGHT: 420,
         }) {
-            console.log(boxes);
             const { S1, S2, WIDTH, HEIGHT } = options;
             const copyBoxes = Object.assign([], boxes);
             let sidewaysBoxes = boxes.filter(box => box.x > box.y).map(box => {
@@ -432,7 +428,7 @@
                     return [endwaysBoxes, []]
                     let marginLeft = 0;
                     const firstRowHight = endwaysBoxes.filter(box => !box.top)[0].y;
-                    const secondRowHight = endwaysBoxes.filter(box => box.top)[0].y;
+                    const secondRowHight = (endwaysBoxes.filter(box => box.top)[0] || {}).y || 0;
                     sidewaysBoxes.map(box => {
                         box.x *= scale;
                         box.y *= scale;
@@ -442,34 +438,33 @@
                         return box;
                     });
                 } else {
-                    return [sidewaysBoxes, endwaysBoxes];
                     const scale = 1 / enlargeWRatio;
-                    let marginLeft_1 = 0;
-                    let marginLeft_2 = 0;
+                    let marginTop_1 = 0;
+                    let marginTop_2 = 0;
                     const paddingTop = (HEIGHT - highCount_2 * scale) / 2;
-                    endwaysBoxes.map(box => {
-                        box.x *= scale;
-                        box.y *= scale;
-                        if (box.top) {
-                            box.top = box.y + paddingTop;
-                            box.left = marginLeft_2;
-                            marginLeft_2 += box.x;
-                        } else {
-                            box.top = paddingTop;
-                            box.left = marginLeft_1;
-                            marginLeft_1 += box.x;
-                        }
-                        return box;
-                    });
-                    let marginLeft = 0;
-                    const firstRowHight = endwaysBoxes.filter(box => !(box.top - paddingTop))[0].y;
-                    const secondRowHight = endwaysBoxes.filter(box => box.top - paddingTop)[0].y;
                     sidewaysBoxes.map(box => {
                         box.x *= scale;
                         box.y *= scale;
-                        box.top = firstRowHight + secondRowHight + paddingTop;
-                        box.left = marginLeft;
-                        marginLeft += box.x;
+                        if (box.left) {
+                            box.top = paddingTop + marginTop_2;
+                            box.left = box.x;
+                            marginTop_2 += box.y;
+                        } else {
+                            box.top = paddingTop + marginTop_2;
+                            box.left = 0;
+                            marginTop_1 += box.y;
+                        }
+                        return box;
+                    });
+                    let marginTop = 0;
+                    const firstColumnWidth = sidewaysBoxes.filter(box => !(box.top - paddingTop))[0].x;
+                    const secondColumnWidth = (sidewaysBoxes.filter(box => box.top - paddingTop)[0] || {}).x || 0;
+                    endwaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        box.top = marginTop + paddingTop;
+                        box.left = firstColumnWidth + secondColumnWidth;
+                        marginTop += box.y;
                         return box;
                     });
                 }
