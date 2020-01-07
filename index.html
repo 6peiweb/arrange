@@ -1,0 +1,853 @@
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        text-align: center;
+    }
+
+    #canvas1 {
+        position: absolute;
+        top: 0px;
+        left: calc(50% - 300px);
+        width: 780px;
+        height: 585px;
+        background: rgba(220, 220, 220, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #app {
+        position: absolute;
+        top: 100px;
+        left: 50px;
+        padding: 10px;
+        border: 1px solid rgba(67, 34, 23, 0.7);
+        text-align: left;
+    }
+
+    .box-input {
+        margin-bottom: 20px;
+    }
+
+    .box-p {
+        text-align: center;
+    }
+
+    .box-button {
+        width: 70px;
+        height: 30px;
+        margin-right: 10px;
+    }
+
+    #canvas2 {
+        position: absolute;
+        top: 585px;
+        left: calc(50% - 300px);
+        width: 780px;
+        height: 585px;
+        background: rgba(220, 220, 220, 0.3);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    box-container {
+        display: block;
+        width: 680px;
+        height: 420px;
+        border: 1px solid rgba(67, 34, 23, 0.7);
+        position: relative;
+    }
+
+    box {
+        position: absolute;
+        background: rgba(168, 149, 217, 0.4);
+        outline: 1px dashed rgba(67, 34, 23, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        user-select: none;
+    }
+</style>
+<title>编辑器支持笔记排版</title>
+<script src="https://cdn.staticfile.org/vue/2.2.2/vue.min.js"></script>
+
+<body>
+    <div id="app">
+        <p class="box-p">
+            <button class="box-button" @click="reset()">重置数据</button class="box-button">
+            <button class="box-button" @click="copyToClipboard()">保存数据</button>
+            <button class="box-button" @click="addBox()">添加 Box</button>
+            <button class="box-button" @click="submit()">应用</button>
+        </p>
+        <div class="box-input" v-for="(box, i) in boxes">
+            <h2>
+                <span>boxId: {{ box.id }}</span>
+                <button @click="deleteBox(i)">删除</button>
+            </h2>
+            <label for="">width: <input type="number" v-model="box.x"></label>
+            <label for="">height: <input type="number" v-model="box.y"></label>
+        </div>
+    </div>
+    <div id="canvas1">
+        <box-container></box-container>
+    </div>
+    <div id="canvas2">
+        <box-container></box-container>
+    </div>
+    <script>
+        const originBoxes = [
+            // { id: 1, y: 100, x: 150 },
+            // { id: 2, y: 100, x: 150 },
+            // { id: 3, y: 100, x: 150 },
+            // { id: 4, y: 100, x: 150 },
+            // { id: 5, y: 100, x: 150 },
+            // { id: 6, y: 100, x: 150 },
+            // { id: 8, y: 100, x: 150 },
+            { id: 1, x: 1, y: 2 },
+            { id: 2, x: 2, y: 1 },
+            { id: 3, x: 1, y: 4 },
+        ];
+        const boxesText = localStorage.getItem('boxes') || JSON.stringify(originBoxes);
+        const vm = new Vue({
+            el: '#app',
+            data: {
+                boxes: JSON.parse(boxesText),
+            },
+            methods: {
+                addBox() {
+                    if (this.boxes.length === 8) {
+                        return alert('不能超过 8 个 box')
+                    }
+                    const maxId = Math.max(...this.boxes.map(box => box.id));
+                    this.boxes.push({
+                        id: maxId + 1,
+                        x: 100,
+                        x: 100,
+                    });
+                },
+                deleteBox(index) {
+                    if (this.boxes.length === 1) {
+                        return alert('必须保留 1 个 box')
+                    }
+                    this.boxes.splice(index, 1);
+                },
+                reset() {
+                    localStorage.clear();
+                    this.boxes = deepClone(originBoxes);
+                },
+                copyToClipboard() {
+                    const text = JSON.stringify(this.boxes);
+                    localStorage.setItem('boxes', text);
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                },
+                submit() {
+                    const originBoxes = deepClone(this.boxes);
+                    const allBoxes = document.querySelectorAll('box');
+                    Array.prototype.slice.call(allBoxes).forEach(box => {
+                        box.parentNode.removeChild(box);
+                    });
+                    main(originBoxes);
+                }
+            }
+        });
+
+        const px = 'px';
+        const BOX_TYPE = {
+            FRAME: 1,
+            ENLARGE: 2,
+            NO_NARROW: 3,
+        };
+        const LAW_VALUE = Math.atan(42 / 68);
+        main(JSON.parse(boxesText));
+
+        function arrangeBoxs(boxes = []) {
+            if (!boxes.length) {
+                return null;
+            }
+            const isAllEndways = boxes.every(box => box.x <= box.y);
+            const isAllSideways = boxes.every(box => box.x >= box.y);
+            if (isAllEndways) {
+                return endwaysArrange(boxes, BOX_TYPE.NO_NARROW);
+            } else if (isAllSideways) {
+                console.log(111);
+                boxes.map(box => {
+                    let { x, y } = box;
+                    box.x = y;
+                    box.y = x;
+                    return box;
+                });
+                return endwaysArrange(boxes, BOX_TYPE.NO_NARROW, {
+                    S: 1.33,
+                    WIDTH: 420,
+                    HEIGHT: 680,
+                }).map(box => {
+                    let { id, x, y, top, left } = box;
+                    return {
+                        id,
+                        x: y,
+                        y: x,
+                        top: left,
+                        left: top,
+                    };
+                });
+            } else {
+                return mixedArrange(boxes);
+            }
+        }
+
+        // 混合排列
+        function mixedArrange(boxes, options = {
+            S1: 0.382,
+            S2: 0.618,
+            WIDTH: 680,
+            HEIGHT: 420,
+        }) {
+            console.log(boxes);
+            const { S1, S2, WIDTH, HEIGHT } = options;
+            const copyBoxes = Object.assign([], boxes);
+            let sidewaysBoxes = boxes.filter(box => box.x > box.y).map(box => {
+                const n = box.y;
+                box.y = S1 * HEIGHT;
+                box.x *= S1 * HEIGHT / n;
+                return box;
+            });
+            let endwaysBoxes = boxes.filter(box => box.x <= box.y).map(box => {
+                const n = box.y;
+                box.y = S2 * HEIGHT;
+                box.x *= (S2 * HEIGHT) / n;
+                return box;
+            });
+            const sidewaysLong = sidewaysBoxes.reduce((a, b) => a + b.x, 0);
+            const endwaysLong = endwaysBoxes.reduce((a, b) => a + b.x, 0);
+            const isSidewaysLarger = sidewaysLong >= endwaysLong;
+            const ratio = isSidewaysLarger ? sidewaysLong / endwaysLong : endwaysLong / sidewaysLong;
+            if (ratio <= S2 / S1) {
+                if (isSidewaysLarger) {
+                    unifomNarrow(sidewaysBoxes, endwaysBoxes, ratio, sidewaysLong);
+                } else {
+                    unifomNarrow(endwaysBoxes, sidewaysBoxes, ratio, endwaysLong);
+                }
+            } else {
+                if (sidewaysLong < endwaysLong) {
+                    // 规则三 1.1
+                    const newBoxes = deepClone([...sidewaysBoxes, ...endwaysBoxes]);
+                    const lessthan618Box = newBoxes.find(box => box.y / box.x < S2);
+                    if (!lessthan618Box) {
+                        // 规则三 1.1.2
+                        [sidewaysBoxes, endwaysBoxes] = mixedUnifomNarrow(sidewaysBoxes, endwaysBoxes);
+                    } else {
+                        // 规则三 1.1.1
+                        // 将竖图组合再与横图合并，计算arctan
+                        [sidewaysBoxes, endwaysBoxes] = combineEndwaysAndSideways(sidewaysBoxes, endwaysBoxes);
+                    }
+                } else {
+                    // 规则三 1.2
+                    const newBoxes = deepClone([...sidewaysBoxes, ...endwaysBoxes]);
+                    const morethan1618Box = newBoxes.find(box => box.y / box.x > S2 / S1);
+                    if (!morethan1618Box) {
+                        // 规则三 1.2.2
+                        [endwaysBoxes, sidewaysBoxes] = mixedUnifomNarrow(endwaysBoxes, sidewaysBoxes);
+                    } else {
+                        // 规则三 1.2.1
+                        [sidewaysBoxes, endwaysBoxes] = combineEndwaysAndSideways(sidewaysBoxes, endwaysBoxes);
+                    }
+                }
+            }
+            return [...sidewaysBoxes, ...endwaysBoxes];
+        }
+
+        function combineEndwaysAndSideways(sidewaysBoxes, endwaysBoxes, options = {
+            S1: 0.382,
+            S2: 0.618,
+            WIDTH: 680,
+            HEIGHT: 420,
+        }) {
+            // 规则三 1.1.1
+            // 将竖图组合再与横图合并，计算arctan
+            const { S1, S2, WIDTH, HEIGHT } = options;
+            sidewaysBoxes_1 = deepClone(sidewaysBoxes);
+            endwaysBoxes_1 = deepClone(endwaysBoxes);
+            endwaysBoxes_1 = endwaysArrange(endwaysBoxes_1, BOX_TYPE.ENLARGE);
+            const firstRowHight = endwaysBoxes_1.filter(box => !box.top)[0].y;
+            const secondRowHight = (endwaysBoxes_1.filter(box => box.top)[0] || {}).y || 0;
+            const endwaysHight = firstRowHight + secondRowHight;
+            let leftCount = 0;
+            sidewaysBoxes_1.map(box => {
+                const n = box.y;
+                box.y = firstRowHight * S1 / S2;
+                box.x = box.x * box.y / n;
+                box.top = endwaysHight;
+                box.left = leftCount;
+                leftCount += box.x;
+                return box;
+            });
+            const firstRowLong = endwaysBoxes_1.filter(box => !box.top).reduce((a, b) => a + b.x, 0);
+            const secondRowLong = endwaysBoxes_1.filter(box => box.top).reduce((a, b) => a + b.x, 0);
+            const endwaysLong_1 = firstRowLong > secondRowLong ? firstRowLong : secondRowLong;
+            const sidewaysLong_1 = sidewaysBoxes_1.reduce((a, b) => a + b.x, 0);
+            const sidewaysHeight = sidewaysBoxes_1[0].y;
+            const longCount_1 = endwaysLong_1 > sidewaysLong_1 ? endwaysLong_1 : sidewaysLong_1;
+            const highCount_1 = endwaysHight + sidewaysHeight;
+            const arctan1 = Math.abs(Math.atan(highCount_1 / longCount_1) - LAW_VALUE);
+            // 将横图组合再与竖图合并，计算arctan
+            sidewaysBoxes_2 = deepClone(sidewaysBoxes);
+            endwaysBoxes_2 = deepClone(endwaysBoxes);
+            sidewaysBoxes_2.map(box => {
+                let { x, y } = box;
+                box.x = y;
+                box.y = x;
+                return box;
+            });
+            sidewaysBoxes_2 = endwaysArrange(sidewaysBoxes_2, BOX_TYPE.ENLARGE, {
+                S: 1.33,
+                WIDTH: 420,
+                HEIGHT: 680,
+            }).map(box => {
+                let { id, x, y, top, left } = box;
+                return {
+                    id,
+                    x: y,
+                    y: x,
+                    top: left,
+                    left: top,
+                };
+            });
+            const firstColumnWidth = sidewaysBoxes_2.filter(box => !box.left)[0].x;
+            const secondColumnWidth = (sidewaysBoxes_2.filter(box => box.left)[0] || {}).x || 0;
+            const sidewaysWidth = firstColumnWidth + secondColumnWidth;
+            let leftTop = 0;
+            endwaysBoxes_2.map(box => {
+                const n = box.x;
+                box.x = firstColumnWidth * 0.447 / 0.553;
+                box.y = box.x * box.y / n;
+                box.left = sidewaysWidth;
+                box.top = leftTop;
+                leftTop += box.y;
+                return box;
+            });
+            const endwaysLong_2 = endwaysBoxes_2[0].x;
+            const firstColumnHigh = sidewaysBoxes_2.filter(box => !box.left).reduce((a, b) => a + b.y, 0);
+            const secondColumnHigh = sidewaysBoxes_2.filter(box => box.left).reduce((a, b) => a + b.y, 0);
+            const endwaysHeigh = endwaysBoxes_2.reduce((a, b) => a + b.y, 0);
+            const longCount_2 = sidewaysWidth + endwaysLong_2;
+            const highCount_2 = Math.max(firstColumnHigh, secondColumnHigh, endwaysHeigh);
+            const arctan2 = Math.abs(Math.atan(highCount_2 / longCount_2) - LAW_VALUE);
+            if (arctan1 < arctan2) {
+                [sidewaysBoxes, endwaysBoxes] = [sidewaysBoxes_1, endwaysBoxes_1];
+                const enlargeHRatio = highCount_1 / HEIGHT;
+                const enlargeWRatio = longCount_1 / WIDTH;
+                if (enlargeHRatio > enlargeWRatio) {
+                    const scale = 1 / enlargeHRatio;
+                    let marginLeft_1 = 0;
+                    let marginLeft_2 = 0;
+                    const paddingLeft = (WIDTH - longCount_1 * scale) / 2;
+                    endwaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        if (box.top) {
+                            box.top = box.y;
+                            box.left = marginLeft_2 + paddingLeft;
+                            marginLeft_2 += box.x;
+                        } else {
+                            box.left = marginLeft_1 + paddingLeft;
+                            marginLeft_1 += box.x;
+                        }
+                        return box;
+                    });
+                    let marginLeft = 0;
+                    const firstRowHight = endwaysBoxes.filter(box => !box.top)[0].y;
+                    const secondRowHight = (endwaysBoxes.filter(box => box.top)[0] || {}).y || 0;
+                    sidewaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        box.top = firstRowHight + secondRowHight;
+                        box.left = marginLeft + paddingLeft;
+                        marginLeft += box.x;
+                        return box;
+                    });
+                } else {
+                    const scale = 1 / enlargeWRatio;
+                    let marginLeft_1 = 0;
+                    let marginLeft_2 = 0;
+                    const paddingTop = (HEIGHT - highCount_1 * scale) / 2;
+                    endwaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        if (box.top) {
+                            box.top = box.y + paddingTop;
+                            box.left = marginLeft_2;
+                            marginLeft_2 += box.x;
+                        } else {
+                            box.top = paddingTop;
+                            box.left = marginLeft_1;
+                            marginLeft_1 += box.x;
+                        }
+                        return box;
+                    });
+                    let marginLeft = 0;
+                    const firstRowHight = endwaysBoxes.filter(box => !(box.top - paddingTop))[0].y;
+                    const secondRowHight = (endwaysBoxes.filter(box => box.top - paddingTop)[0] || {}).y || 0;
+                    sidewaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        box.top = firstRowHight + secondRowHight + paddingTop;
+                        box.left = marginLeft;
+                        marginLeft += box.x;
+                        return box;
+                    });
+                }
+            } else {
+                [sidewaysBoxes, endwaysBoxes] = [sidewaysBoxes_2, endwaysBoxes_2];
+                const enlargeHRatio = highCount_2 / HEIGHT;
+                const enlargeWRatio = longCount_2 / WIDTH;
+                if (enlargeHRatio > enlargeWRatio) {
+                    const scale = 1 / enlargeHRatio;
+                    let marginLeft_1 = 0;
+                    let marginLeft_2 = 0;
+                    const paddingLeft = (WIDTH - longCount_2 * scale) / 2;
+                    endwaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        if (box.top) {
+                            box.top = box.y;
+                            box.left = marginLeft_2 + paddingLeft;
+                            marginLeft_2 += box.x;
+                        } else {
+                            box.left = marginLeft_1 + paddingLeft;
+                            marginLeft_1 += box.x;
+                        }
+                        return box;
+                    });
+                    return [endwaysBoxes, []]
+                    let marginLeft = 0;
+                    const firstRowHight = endwaysBoxes.filter(box => !box.top)[0].y;
+                    const secondRowHight = endwaysBoxes.filter(box => box.top)[0].y;
+                    sidewaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        box.top = firstRowHight + secondRowHight;
+                        box.left = marginLeft + paddingLeft;
+                        marginLeft += box.x;
+                        return box;
+                    });
+                } else {
+                    return [sidewaysBoxes, endwaysBoxes];
+                    const scale = 1 / enlargeWRatio;
+                    let marginLeft_1 = 0;
+                    let marginLeft_2 = 0;
+                    const paddingTop = (HEIGHT - highCount_2 * scale) / 2;
+                    endwaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        if (box.top) {
+                            box.top = box.y + paddingTop;
+                            box.left = marginLeft_2;
+                            marginLeft_2 += box.x;
+                        } else {
+                            box.top = paddingTop;
+                            box.left = marginLeft_1;
+                            marginLeft_1 += box.x;
+                        }
+                        return box;
+                    });
+                    let marginLeft = 0;
+                    const firstRowHight = endwaysBoxes.filter(box => !(box.top - paddingTop))[0].y;
+                    const secondRowHight = endwaysBoxes.filter(box => box.top - paddingTop)[0].y;
+                    sidewaysBoxes.map(box => {
+                        box.x *= scale;
+                        box.y *= scale;
+                        box.top = firstRowHight + secondRowHight + paddingTop;
+                        box.left = marginLeft;
+                        marginLeft += box.x;
+                        return box;
+                    });
+                }
+            }
+            return [sidewaysBoxes, endwaysBoxes];
+        }
+
+        // 当 x1 < x2 && 并且有图片斜率<0.618 || x1 》 x2 && 并且有图片斜率>1.618，则从长度较长的一侧拉取图片加入长度较短的一侧
+        function mixedUnifomNarrow(sidewaysBoxes, endwaysBoxes, options = {
+            S1: 0.382,
+            S2: 0.618,
+            WIDTH: 680,
+            HEIGHT: 420,
+        }) {
+            const { S1, S2, WIDTH, HEIGHT } = options;
+            endwaysBoxes = endwaysBoxes.map(box => {
+                box.slope = box.y / box.x;
+                return box;
+            }).sort((a, b) => a.slope - b.slope);
+            let endToSideBoxOne = endwaysBoxes.shift();
+            endToSideBoxOne = Object.assign(endToSideBoxOne, {
+                y: sidewaysBoxes[0].y,
+                x: endToSideBoxOne.x * sidewaysBoxes[0].y / endToSideBoxOne.y,
+            });
+            sidewaysBoxes.push(endToSideBoxOne);
+            const sidewaysLong = sidewaysBoxes.reduce((a, b) => a + b.x, 0);
+            const endwaysLong = endwaysBoxes.reduce((a, b) => a + b.x, 0);
+            const isSidewaysLarger = sidewaysLong >= endwaysLong;
+            const ratio = isSidewaysLarger ? sidewaysLong / endwaysLong : endwaysLong / sidewaysLong;
+            if (endwaysLong / sidewaysLong < S2 / S1) {
+                // 规则三 1.1.2.1
+                if (isSidewaysLarger) {
+                    unifomNarrow(sidewaysBoxes, endwaysBoxes, ratio, sidewaysLong);
+                } else {
+                    unifomNarrow(endwaysBoxes, sidewaysBoxes, ratio, endwaysLong);
+                }
+            } else {
+                // 规则三 1.1.2.2
+                let endToSideBoxTwo = endwaysBoxes.shift();
+                endToSideBoxTwo = Object.assign(endToSideBoxTwo, {
+                    y: sidewaysBoxes[0].y,
+                    x: endToSideBoxTwo.x * sidewaysBoxes[0].y / endToSideBoxTwo.y,
+                });
+                sidewaysBoxes.push(endToSideBoxTwo);
+                const sidewaysLong = sidewaysBoxes.reduce((a, b) => a + b.x, 0);
+                const endwaysLong = endwaysBoxes.reduce((a, b) => a + b.x, 0);
+                const isSidewaysLarger = sidewaysLong >= endwaysLong;
+                const ratio = isSidewaysLarger ? sidewaysLong / endwaysLong : endwaysLong / sidewaysLong;
+                if (isSidewaysLarger) {
+                    unifomNarrow(sidewaysBoxes, endwaysBoxes, ratio, sidewaysLong);
+                } else {
+                    unifomNarrow(endwaysBoxes, sidewaysBoxes, ratio, endwaysLong);
+                }
+            }
+            return [sidewaysBoxes, endwaysBoxes];
+        }
+
+        // 当横版图片高 * 0.318 & 竖版图片高 * 0.618 比较长度小于0.618 同比缩小
+        function unifomNarrow(sidewaysBoxes, endwaysBoxes, ratio, sidewaysLong, options = {
+            WIDTH: 680,
+            HEIGHT: 420,
+        }) {
+            const { WIDTH, HEIGHT } = options;
+            const sidewaysHeight = sidewaysBoxes[0].y;
+            endwaysBoxes.map(box => {
+                box.x *= ratio;
+                box.y *= ratio;
+            });
+            const endwaysHeight = endwaysBoxes[0].y;
+            const enlargeHigh = sidewaysHeight + endwaysHeight;
+            const enlargeHRatio = (sidewaysHeight + endwaysHeight) / HEIGHT;
+            const enlargeWRatio = sidewaysLong / WIDTH;
+            const enlargeSidewaysLong = sidewaysBoxes.reduce((a, b) => a + b.x, 0);
+            const enlargeEndwaysLong = endwaysBoxes.reduce((a, b) => a + b.x, 0);
+            const scale = enlargeHRatio >= enlargeWRatio ? HEIGHT / enlargeHigh : WIDTH / enlargeSidewaysLong;
+            let leftCount = 0;
+            sidewaysBoxes.map(box => {
+                box.x *= scale;
+                box.y *= scale;
+                box.top = 0;
+                box.left = leftCount;
+                leftCount += box.x;
+                return box;
+            });
+            leftCount = 0;
+            if (enlargeHRatio >= enlargeWRatio) {
+                const sidewaysHeight = sidewaysBoxes[0].y;
+                endwaysBoxes.map(box => {
+                    box.x *= scale;
+                    box.y *= scale;
+                    box.top = sidewaysHeight;
+                    box.left = leftCount;
+                    leftCount += box.x;
+                    return box;
+                });
+                const enlargeSidewaysLong = sidewaysBoxes.reduce((a, b) => a + b.x, 0);
+                const marginLeft = (WIDTH - enlargeSidewaysLong) / 2;
+                sidewaysBoxes.map(box => {
+                    box.left += marginLeft;
+                    return box;
+                });
+                endwaysBoxes.map(box => {
+                    box.left += marginLeft;
+                    return box;
+                });
+            } else {
+                endwaysBoxes.map(box => {
+                    box.x *= scale;
+                    box.y *= scale;
+                    box.top = 0;
+                    box.left = leftCount;
+                    leftCount += box.x;
+                    return box;
+                });
+                const sidewaysHeight = sidewaysBoxes[0].y;
+                const endwaysHeight = endwaysBoxes[0].y;
+                const marginTop = (HEIGHT - sidewaysHeight - endwaysHeight) / 2;
+                sidewaysBoxes.map(box => {
+                    box.top += marginTop;
+                    return box;
+                });
+                endwaysBoxes.map(box => {
+                    box.top += marginTop + sidewaysHeight;
+                    return box;
+                });
+            }
+        }
+
+
+        // 全竖排列(全横排列传入不同参数即可)
+        function endwaysArrange(boxes, boxType = 1, options = {
+            S: 0.4,
+            WIDTH: 680,
+            HEIGHT: 420,
+        }) {
+            const { S, WIDTH, HEIGHT } = options;
+            const copyBoxes = Object.assign([], boxes);
+            copyBoxes.map(box => {
+                box.x = box.x * HEIGHT / box.y;
+                box.y = HEIGHT;
+                return box;
+            });
+            const long = copyBoxes.reduce((a, b) => a + b.x, 0);
+            const ratio = HEIGHT / long;
+            // 当 y/x >= 0.4 直接缩小图片整体比例，居中展示
+            if (ratio >= S) {
+                let leftCount = 0;
+                if (boxType === BOX_TYPE.ENLARGE) {
+                    return copyBoxes.map(box => {
+                        box.top = 0;
+                        box.left = leftCount;
+                        leftCount += box.x;
+                        return box;
+                    });
+                }
+                leftCount = 0;
+                const scale = WIDTH / long;
+                copyBoxes.map(box => {
+                    box.x *= scale;
+                    box.y *= scale;
+                    box.top = (HEIGHT - box.y) / 2;
+                    box.left = leftCount;
+                    leftCount += box.x;
+                    return box;
+                });
+                return copyBoxes;
+            } else {
+                // 当 y/x < S 首先计算两排相应的 box 是哪些，然后寻找长度最小那一行，扩大至更长一行的长度
+                const boxXS = copyBoxes.map(box => box.x);
+                const suitXS = findSuitCombine(boxXS, long / 2);
+                const firstRow = copyBoxes.filter(box => {
+                    const index = suitXS.indexOf(box.x);
+                    if (index > -1) {
+                        suitXS.splice(index, 1);
+                        return true;
+                    }
+                    return false;
+                });
+                const secondRowIds = firstRow.map(box => box.id);
+                const secondRow = copyBoxes.filter(box => !secondRowIds.includes(box.id));
+                const firstRowLong = firstRow.reduce((a, b) => a + b.x, 0);
+                const secondRowLong = secondRow.reduce((a, b) => a + b.x, 0);
+                if (boxType === BOX_TYPE.ENLARGE) {
+                    let leftCount = 0
+                    firstRow.map(box => {
+                        box.top = 0;
+                        box.left = leftCount;
+                        leftCount += box.x;
+                        return box;
+                    });
+                    leftCount = 0;
+                    const firstRowHight = firstRow[0].y;
+                    secondRow.map(box => {
+                        box.top = firstRowHight;
+                        box.left = leftCount;
+                        leftCount += box.x;
+                        return box;
+                    });
+                    return [...firstRow, ...secondRow];
+                }
+                if (boxType !== BOX_TYPE.NO_NARROW) {
+                    if (firstRowLong <= secondRowLong) {
+                        const scale = secondRowLong / firstRowLong;
+                        firstRow.map(box => {
+                            box.x *= scale;
+                            box.y *= scale;
+                            return box;
+                        });
+                    } else {
+                        const scale = firstRowLong / secondRowLong;
+                        secondRow.map(box => {
+                            box.x *= scale;
+                            box.y *= scale;
+                            return box;
+                        });
+                    }
+                }
+                // 计算宽高比例大小，同比缩小
+                const firstRowHigh = firstRow[0].y;
+                const secondRowHigh = secondRow[0].y;
+                const enlargeLong = secondRowLong > firstRowLong ? secondRowLong : firstRowLong;
+                const enlargeHRatio = (firstRowHigh + secondRowHigh) / HEIGHT;
+                const enlargeWRatio = enlargeLong / WIDTH;
+                const enlargeRatio = enlargeHRatio >= enlargeWRatio ? enlargeHRatio : enlargeWRatio;
+                let leftCount = 0
+                firstRow.map(box => {
+                    box.x /= enlargeRatio;
+                    box.y /= enlargeRatio;
+                    box.top = 0;
+                    box.left = leftCount;
+                    leftCount += box.x;
+                    return box;
+                });
+                secondRow.map(box => {
+                    box.x /= enlargeRatio;
+                    box.y /= enlargeRatio;
+                    return box;
+                });
+                const firstRowHight = firstRow[0].y;
+                leftCount = 0;
+                if (enlargeHRatio >= enlargeWRatio) {
+                    const firstRowLong = firstRow.reduce((a, b) => a + b.x, 0);
+                    const marginLeft = (WIDTH - firstRowLong) / 2;
+                    firstRow.map(box => {
+                        box.left += marginLeft;
+                        return box;
+                    });
+                    secondRow.map(box => {
+                        box.top = firstRowHight;
+                        box.left = leftCount + marginLeft;
+                        leftCount += box.x;
+                        return box;
+                    });
+                } else {
+                    const secondRowHight = secondRow[0].y;
+                    const marginTop = (HEIGHT - (firstRowHight + secondRowHight)) / 2;
+                    firstRow.map(box => {
+                        box.top += marginTop;
+                        return box;
+                    });
+                    secondRow.map(box => {
+                        box.top = firstRowHight + marginTop;
+                        box.left = leftCount;
+                        leftCount += box.x;
+                        return box;
+                    });
+                }
+                return [...firstRow, ...secondRow];
+            }
+        }
+
+        // 从组合中选出最适合目标值的组合
+        function findSuitCombine(nums, target, prevNums = []) {
+            nums = nums.sort((a, b) => a - b);
+            const suitList = [];
+            let count = 0;
+            nums.forEach(num => {
+                const compare = (prevNums.length ? count + num : count) < target;
+                if (compare) {
+                    suitList.push(num);
+                    count += num;
+                }
+            });
+            const exceed = count - target;
+            if (suitList.length && exceed > 0) {
+                return findSuitCombine(suitList, exceed, suitList);
+            } else if (prevNums.length) {
+                return prevNums.filter(num => !suitList.includes(num));
+            } else {
+                return suitList;
+            }
+        }
+
+        // demo 展示
+        function demoShow(boxes) {
+            if (!boxes.length) {
+                return null;
+            }
+            const boxContainers = document.querySelectorAll('box-container');
+            const isAllEndways = boxes.every(box => box.x <= box.y);
+            const isAllSideways = boxes.every(box => box.x >= box.y);
+            if (isAllEndways) {
+                let leftCount = 0;
+                boxes.forEach(box => {
+                    const { id, x, y } = box;
+                    const boxEl = document.createElement('box');
+                    boxEl.style.top = 0 + px;
+                    boxEl.style.left = leftCount + px;
+                    boxEl.style.width = x + px;
+                    boxEl.style.height = y + px;
+                    boxEl.innerText = id;
+                    leftCount += box.x;
+                    boxContainers[0].appendChild(boxEl);
+                });
+            } else if (isAllSideways) {
+                let topCount = 0;
+                boxes.forEach(box => {
+                    const { id, x, y } = box;
+                    const boxEl = document.createElement('box');
+                    boxEl.style.top = topCount + px;
+                    boxEl.style.left = 0 + px;
+                    boxEl.style.width = x + px;
+                    boxEl.style.height = y + px;
+                    boxEl.innerText = id;
+                    topCount += box.y;
+                    boxContainers[0].appendChild(boxEl);
+                });
+            } else {
+                const sidewaysBoxes = boxes.filter(box => box.x > box.y);
+                const endwaysBoxes = boxes.filter(box => box.x <= box.y);
+                let leftCount = 0;
+                sidewaysBoxes.forEach(box => {
+                    const { id, x, y } = box;
+                    const boxEl = document.createElement('box');
+                    boxEl.style.top = 0 + px;
+                    boxEl.style.left = leftCount + px;
+                    boxEl.style.width = x + px;
+                    boxEl.style.height = y + px;
+                    boxEl.innerText = id;
+                    leftCount += +box.x;
+                    boxContainers[0].appendChild(boxEl);
+                });
+                leftCount = 0;
+                const maxTop = Math.max(...sidewaysBoxes.map(box => box.y));
+                endwaysBoxes.forEach(box => {
+                    const { id, x, y } = box;
+                    const boxEl = document.createElement('box');
+                    boxEl.style.top = maxTop + px;
+                    boxEl.style.left = leftCount + px;
+                    boxEl.style.width = x + px;
+                    boxEl.style.height = y + px;
+                    boxEl.innerText = id;
+                    leftCount += +box.x;
+                    boxContainers[0].appendChild(boxEl);
+                });
+            }
+        }
+
+        function deepClone(target) {
+            return JSON.parse(JSON.stringify(target));
+        }
+
+        // 启动排列
+        function main(originBoxes) {
+            const boxes = Object.assign([], originBoxes);
+            demoShow(boxes);
+            const boxContainers = document.querySelectorAll('box-container');
+            const positionBoxes = arrangeBoxs(boxes);
+            positionBoxes.forEach(box => {
+                const { id, x, y, top, left } = box;
+                const boxEl = document.createElement('box');
+                boxEl.style.top = top + px;
+                boxEl.style.left = left + px;
+                boxEl.style.width = x + px;
+                boxEl.style.height = y + px;
+                boxEl.innerText = id;
+                boxContainers[1].appendChild(boxEl);
+            });
+        }
+    </script>
+</body>
