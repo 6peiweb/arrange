@@ -38,9 +38,10 @@
     }
 
     .box-button {
-        width: 70px;
-        height: 30px;
+        width: 220px;
+        height: 70px;
         margin-right: 10px;
+        text-align: center;
     }
 
     #canvas2 {
@@ -80,6 +81,7 @@
     <div id="app">
         <p class="box-p">
             <button class="box-button" @click="reset()">重置数据</button class="box-button">
+            <button class="box-button" :disabled="!content" @click="exportData()">导入数据</button>
             <button class="box-button" @click="copyToClipboard()">保存数据</button>
             <button class="box-button" @click="addBox()">添加 Box</button>
             <button class="box-button" @click="submit()">应用</button>
@@ -92,6 +94,10 @@
             <label for="">width: <input type="number" v-model="box.x"></label>
             <label for="">height: <input type="number" v-model="box.y"></label>
         </div>
+        <label for="">
+            导入数据:
+            <textarea cols="30" rows="10" v-model="content"></textarea>
+        </label>
     </div>
     <div id="canvas1">
         <box-container></box-container>
@@ -108,8 +114,8 @@
             // { id: 5, y: 100, x: 150 },
             // { id: 6, y: 100, x: 150 },
             // { id: 8, y: 100, x: 150 },
-            { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "101" }
-            // { id: 1, x: 300, y: 150 }, { id: 2, x: 200, y: 150 }, { id: 3, x: 300, y: 150 }, { id: 4, x: 160, y: 150 }, { id: 5, x: 100, y: 100 }, { id: 6, x: 80, y: 100 }, { id: 7, x: 60, y: 100 }
+            // { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "101" }
+            { id: 1, x: 300, y: 150 }, { id: 2, x: 200, y: 150 }, { id: 3, x: 300, y: 150 }, { id: 4, x: 160, y: 150 }, { id: 5, x: 100, y: 100 }, { id: 6, x: 80, y: 100 }, { id: 7, x: 60, y: 100 }
         ];
         const boxesText = localStorage.getItem('boxes') || JSON.stringify(originBoxes);
         const vm = new Vue({
@@ -121,6 +127,7 @@
                     box.y = +box.y;
                     return box;
                 }),
+                content: '',
             },
             methods: {
                 addBox() {
@@ -143,6 +150,15 @@
                 reset() {
                     localStorage.clear();
                     this.boxes = deepClone(originBoxes);
+                    this.content = '';
+                },
+                exportData() {
+                    console.log(this.content);
+                    try {
+                        this.boxes = JSON.parse(this.content);
+                    } catch {
+                        alert('导入数据非JSON格式');
+                    }
                 },
                 copyToClipboard() {
                     const text = JSON.stringify(this.boxes);
@@ -156,7 +172,12 @@
                     document.body.removeChild(textArea);
                 },
                 submit() {
-                    const originBoxes = deepClone(this.boxes);
+                    const originBoxes = deepClone(this.boxes).map(box => {
+                        box.id = +box.id;
+                        box.x = +box.x;
+                        box.y = +box.y;
+                        return box;
+                    });
                     const allBoxes = document.querySelectorAll('box');
                     Array.prototype.slice.call(allBoxes).forEach(box => {
                         box.parentNode.removeChild(box);
