@@ -154,10 +154,11 @@
                 },
                 exportData() {
                     try {
-                        if (typeof this.content !== 'object') {
+                        const data = JSON.parse(this.content);
+                        if (typeof data !== 'object') {
                             throw new Error();
                         }
-                        this.boxes = JSON.parse(this.content);
+                        this.boxes = data;
                     } catch {
                         alert('导入数据非JSON格式');
                     }
