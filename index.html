@@ -108,8 +108,8 @@
             // { id: 5, y: 100, x: 150 },
             // { id: 6, y: 100, x: 150 },
             // { id: 8, y: 100, x: 150 },
-            // { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "101" }
-            { id: 1, x: 300, y: 150 }, { id: 2, x: 200, y: 150 }, { id: 3, x: 300, y: 150 }, { id: 4, x: 160, y: 150 }, { id: 5, x: 100, y: 100 }, { id: 6, x: 80, y: 100 }, { id: 7, x: 60, y: 100 }
+            { "id": 1, "x": "320", "y": "240" }, { "id": 2, "x": "160", "y": "320" }, { "id": 3, "x": "200", "y": "20" }, { "id": 4, "x": 100, "y": "101" }
+            // { id: 1, x: 300, y: 150 }, { id: 2, x: 200, y: 150 }, { id: 3, x: 300, y: 150 }, { id: 4, x: 160, y: 150 }, { id: 5, x: 100, y: 100 }, { id: 6, x: 80, y: 100 }, { id: 7, x: 60, y: 100 }
         ];
         const boxesText = localStorage.getItem('boxes') || JSON.stringify(originBoxes);
         const vm = new Vue({
@@ -415,36 +415,43 @@
                     });
                 }
             } else {
+                [sidewaysBoxes, endwaysBoxes] = [sidewaysBoxes_2, endwaysBoxes_2];
                 const enlargeHRatio = highCount_2 / HEIGHT;
                 const enlargeWRatio = longCount_2 / WIDTH;
                 if (enlargeHRatio > enlargeWRatio) {
+                    const twoColumnIsEndways = endwaysBoxes.find(box => box.left) && endwaysBoxes.find(box => !box.left);
+                    [endwaysBoxes, sidewaysBoxes] = twoColumnIsEndways ? [endwaysBoxes, sidewaysBoxes] : [sidewaysBoxes, endwaysBoxes];
                     const scale = 1 / enlargeHRatio;
                     let marginLeft_1 = 0;
                     let marginLeft_2 = 0;
+                    let marginTop_1 = 0;
+                    let marginTop_2 = 0;
                     const paddingLeft = (WIDTH - longCount_2 * scale) / 2;
                     endwaysBoxes.map(box => {
                         box.x *= scale;
                         box.y *= scale;
-                        if (box.top) {
-                            box.top = box.y;
-                            box.left = marginLeft_2 + paddingLeft;
+                        if (box.left) {
+                            box.top = marginTop_2;
+                            box.left = marginLeft_2 + paddingLeft + box.x;
                             marginLeft_2 += box.x;
+                            marginTop_2 += box.y;
                         } else {
+                            box.top = marginTop_1;
                             box.left = marginLeft_1 + paddingLeft;
                             marginLeft_1 += box.x;
+                            marginTop_1 += box.y;
                         }
                         return box;
                     });
-                    return [endwaysBoxes, []]
-                    let marginLeft = 0;
-                    const firstRowHight = endwaysBoxes.filter(box => !box.top)[0].y;
-                    const secondRowHight = (endwaysBoxes.filter(box => box.top)[0] || {}).y || 0;
+                    let marginTop = 0;
+                    const firstColumnWidth = endwaysBoxes.filter(box => !(box.left - paddingLeft))[0].x;
+                    const secondColumnWidth = (endwaysBoxes.filter(box => (box.left - paddingLeft))[0] || {}).x || 0;
                     sidewaysBoxes.map(box => {
                         box.x *= scale;
                         box.y *= scale;
-                        box.top = firstRowHight + secondRowHight;
-                        box.left = marginLeft + paddingLeft;
-                        marginLeft += box.x;
+                        box.top = marginTop;
+                        box.left = firstColumnWidth + secondColumnWidth + paddingLeft;
+                        marginTop += box.y;
                         return box;
                     });
                 } else {
