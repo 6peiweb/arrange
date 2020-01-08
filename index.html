@@ -153,8 +153,10 @@
                     this.content = '';
                 },
                 exportData() {
-                    console.log(this.content);
                     try {
+                        if (typeof this.content !== 'object') {
+                            throw new Error();
+                        }
                         this.boxes = JSON.parse(this.content);
                     } catch {
                         alert('导入数据非JSON格式');
